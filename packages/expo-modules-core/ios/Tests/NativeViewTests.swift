@@ -1,6 +1,7 @@
 // Copyright 2026-present 650 Industries. All rights reserved.
 
 import Testing
+import ExpoModulesJSI
 
 @testable import ExpoModulesCore
 
@@ -24,6 +25,13 @@ private final class NativeCardView: ExpoNativeView {
 
 @ExpoModule("NativeCards", views: [NativeCardView.self])
 private final class NativeCardsModule: Module {}
+
+@ExpoModule("CollidingCards", views: [NativeCardView.self])
+private final class CollidingCardsModule: Module {
+  func definition() -> ModuleDefinition {
+    Constant("NativeCardView") { "constant" }
+  }
+}
 
 // MARK: - Tests
 
@@ -100,5 +108,91 @@ struct NativeViewTests {
     #expect(ObjectIdentifier(viewType) == ObjectIdentifier(NativeCardView.self))
     #expect(viewType.propNames == ["title", "radius"])
     #expect(viewType.eventNames == ["onTap"])
+  }
+}
+
+/// Creates the React components of `@ExpoView` views through the module object, with a stub factory in place of
+/// the one that expo-modules-core's JS installs.
+@Suite
+@JavaScriptActor
+struct NativeViewComponentTests {
+  let appContext: AppContext
+  var runtime: ExpoRuntime {
+    get throws {
+      try appContext.runtime
+    }
+  }
+
+  init() throws {
+    appContext = AppContext.create()
+    appContext.moduleRegistry.register(moduleType: NativeCardsModule.self, name: nil)
+    appContext.moduleRegistry.register(moduleType: CollidingCardsModule.self, name: nil)
+    try runtime.eval(
+      """
+      configs = [];
+      expo.__createNativeViewComponent = (config) => {
+        configs.push(config);
+        return function NativeView() {};
+      };
+      """
+    )
+  }
+
+  @Test
+  func `module object has a lazy getter for each view`() throws {
+    let descriptor = try runtime.eval("Object.getOwnPropertyDescriptor(expo.modules.NativeCards, 'NativeCardView')").asObject()
+
+    let isGetter = descriptor.getProperty("get").isFunction()
+    #expect(isGetter)
+    #expect(try descriptor.getProperty("enumerable").asBool() == true)
+    #expect(try descriptor.getProperty("configurable").asBool() == true)
+    #expect(try runtime.eval("configs.length").asInt() == 0)
+  }
+
+  @Test
+  func `reading a view creates its component once`() throws {
+    #expect(try runtime.eval("expo.modules.NativeCards.NativeCardView === expo.modules.NativeCards.NativeCardView").asBool())
+    #expect(try runtime.eval("configs.length").asInt() == 1)
+
+    let config = try runtime.eval("configs[0]").asObject()
+    #expect(try config.getProperty("name").asString() == "ViewManagerAdapter_NativeCards_NativeCardView")
+    #expect(try config.getProperty("displayName").asString() == "NativeCardView")
+    #expect(try runtime.eval("JSON.stringify(configs[0].validAttributes)").asString() == #"{"title":true,"radius":true}"#)
+    #expect(try runtime.eval("JSON.stringify(configs[0].directEventTypes)").asString() == #"{"topTap":{"registrationName":"onTap"}}"#)
+
+    let descriptor = try runtime.eval("Object.getOwnPropertyDescriptor(expo.modules.NativeCards, 'NativeCardView')").asObject()
+    let isComponent = descriptor.getProperty("value").isFunction()
+    #expect(isComponent)
+    #expect(try descriptor.getProperty("enumerable").asBool() == true)
+    #expect(try descriptor.getProperty("writable").asBool() == false)
+  }
+
+  @Test
+  func `default view is a separate non-enumerable component`() throws {
+    let property = ModuleHolder.defaultViewPropertyName
+
+    #expect(try runtime.eval("Object.keys(expo.modules.NativeCards).includes('\(property)')").asBool() == false)
+    #expect(try runtime.eval("typeof expo.modules.NativeCards.\(property)").asString() == "function")
+    #expect(try runtime.eval("expo.modules.NativeCards.\(property) !== expo.modules.NativeCards.NativeCardView").asBool())
+    #expect(try runtime.eval("configs[0].name").asString() == "ViewManagerAdapter_NativeCards")
+    #expect(try runtime.eval("configs[0].displayName").asString() == "NativeCardView")
+  }
+
+  @Test
+  func `view does not replace a module property with the same name`() throws {
+    #expect(try runtime.eval("expo.modules.CollidingCards.NativeCardView").asString() == "constant")
+    #expect(try runtime.eval("configs.length").asInt() == 0)
+  }
+
+  @Test
+  func `reading a view without the factory throws`() throws {
+    try runtime.eval("delete expo.__createNativeViewComponent")
+
+    #expect(throws: (any Error).self) {
+      try runtime.eval("expo.modules.NativeCards.NativeCardView")
+    }
+    // The getter stays, so a later read can create the component.
+    try runtime.eval("expo.__createNativeViewComponent = () => function NativeView() {}")
+    #expect(try runtime.eval("typeof expo.modules.NativeCards.NativeCardView").asString() == "function")
   }
 }
