@@ -1,24 +1,194 @@
----
-title: app.json / app.config.js
-description: A reference of available properties in Expo app config.
-maxHeadingDepth: 5
----
 
-import { CodeSquare01Icon } from '@expo/styleguide-icons/outline/CodeSquare01Icon';
+import React, { useState } from 'react';
+import {
+  View, Text, TextInput,
+  TouchableOpacity, ScrollView,
+  StyleSheet
+} from 'react-native';
 
-import schema from '~/public/static/schemas/unversioned/app-config-schema.json';
-import AppConfigSchemaTable from '~/ui/components/AppConfigSchemaTable';
-import { BoxLink } from '~/ui/components/BoxLink';
+export default function App() {
+  const [page, setPage] = useState('Home');
+  const [trip, setTrip] = useState('Portugal Golf Tour');
+  const [players, setPlayers] = useState([
+    { name: 'You', handicap: 18 },
+    { name: 'James', handicap: 12 },
+    { name: 'Dave', handicap: 24 }
+  ]);
+  const [newName, setNewName] = useState('');
 
-The following is a list of properties that are available for you under the `"expo"` key in **app.json** or **app.config.json**. These properties can be passed to the top level object of **app.config.js** or **app.config.ts**.
+  const addPlayer = () => {
+    if (!newName.trim()) return;
+    setPlayers([...players, {
+      name: newName.trim(),
+      handicap: 18
+    }]);
+    setNewName('');
+  };
 
-<BoxLink
-  title="Configuration with app config"
-  description="For information on app configuration, the differences between various app config files, and how to use them dynamically."
-  href="/workflow/configuration/"
-  Icon={CodeSquare01Icon}
-/>
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.brand}>⛳ PITCH & PINT 🍺</Text>
+        <Text style={styles.heading}>{page}</Text>
+      </View>
 
-## Properties
+      <ScrollView style={styles.content}>
+        {page === 'Home' && (
+          <>
+            <Text style={styles.title}>Your Golf Holiday</Text>
+            <Text style={styles.card}>{trip}</Text>
+            <Text style={styles.card}>
+              {players.length} Golfers
+            </Text>
+            <Text style={styles.card}>
+              Portugal · May 2027
+            </Text>
+          </>
+        )}
 
-<AppConfigSchemaTable schema={schema} />
+        {page === 'Trips' && (
+          <>
+            <Text style={styles.title}>Holiday Details</Text>
+            <TextInput
+              style={styles.input}
+              value={trip}
+              onChangeText={setTrip}
+              placeholder="Holiday name"
+            />
+            <Text style={styles.card}>
+              Course: Vale do Lobo Royal
+            </Text>
+            <Text style={styles.card}>
+              Tee time: 9:30 AM
+            </Text>
+          </>
+        )}
+
+        {page === 'Golfers' && (
+          <>
+            <Text style={styles.title}>Your Golfers</Text>
+            {players.map((p, i) => (
+              <Text key={i} style={styles.card}>
+                {p.name} · HCP {p.handicap}
+              </Text>
+            ))}
+            <TextInput
+              style={styles.input}
+              placeholder="New golfer name"
+              value={newName}
+              onChangeText={setNewName}
+            />
+            <TouchableOpacity
+              style={styles.button}
+              onPress={addPlayer}
+            >
+              <Text style={styles.buttonText}>Add Golfer</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {page === 'Payments' && (
+          <>
+            <Text style={styles.title}>Payments</Text>
+            <Text style={styles.card}>
+              Holiday cost: £450 per golfer
+            </Text>
+            <Text style={styles.card}>
+              Payment tracking coming next
+            </Text>
+          </>
+        )}
+
+        {page === 'Scores' && (
+          <>
+            <Text style={styles.title}>Leaderboard</Text>
+            <Text style={styles.card}>1. James — 39 pts</Text>
+            <Text style={styles.card}>2. You — 34 pts</Text>
+            <Text style={styles.card}>3. Dave — 28 pts</Text>
+          </>
+        )}
+      </ScrollView>
+
+      <View style={styles.nav}>
+        {['Home', 'Trips', 'Golfers', 'Payments', 'Scores'].map(
+          item => (
+            <TouchableOpacity
+              key={item}
+              onPress={() => setPage(item)}
+            >
+              <Text style={styles.navText}>{item}</Text>
+            </TouchableOpacity>
+          )
+        )}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingTop: 45
+  },
+  header: {
+    backgroundColor: '#123D2D',
+    padding: 22
+  },
+  brand: {
+    color: '#F4C66A',
+    fontSize: 17,
+    fontWeight: 'bold'
+  },
+  heading: {
+    color: 'white',
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginTop: 10
+  },
+  content: {
+    flex: 1,
+    padding: 18
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 15
+  },
+  card: {
+    backgroundColor: '#EAF3ED',
+    padding: 18,
+    borderRadius: 12,
+    marginBottom: 12,
+    fontSize: 16
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#CCCCCC',
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 12
+  },
+  button: {
+    backgroundColor: '#176D37',
+    padding: 15,
+    borderRadius: 10
+  },
+  buttonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold'
+  },
+  nav: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 15,
+    borderTopWidth: 1,
+    borderColor: '#DDDDDD'
+  },
+  navText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#123D2D'
+  }
+});
